@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -51,15 +51,31 @@ func main() {
 			case "exit":
 				fmt.Println("exit is a shell builtin")
 			default:
-				if _, err := os.Stat(path.Join("/bin", inputParts[1])); err == nil {
-					fmt.Printf("%s is /bin/%s\n", inputParts[1], inputParts[1])
-				} else if _, err := os.Stat(path.Join("/usr/bin", inputParts[1])); err == nil {
-					fmt.Printf("%s is /usr/bin/%s\n", inputParts[1], inputParts[1])
-				} else if _, err := os.Stat(path.Join("/tmp/pear/raspberry/pineapple", inputParts[1])); err == nil {
-					fmt.Printf("%s is /tmp/pear/raspberry/pineapple/%s\n", inputParts[1], inputParts[1])
+				pathEnv := os.Getenv("PATH")
+				if pathEnv != "" {
+					// Split PATH into directories
+					paths := strings.Split(pathEnv, ":")
+
+					// Search for the command in each directory
+					found := false
+					for _, dir := range paths {
+						fullPath := filepath.Join(dir, inputParts[1])
+
+						// Check if file exists and is executable
+						info, err := os.Stat(fullPath)
+						if err == nil && !info.IsDir() && (info.Mode()&0111 != 0) {
+							fmt.Printf("%s is %s\n", inputParts[1], fullPath)
+							found = true
+							break
+						}
+					}
+					if !found {
+						fmt.Printf("%s: not found\n", inputParts[1])
+					}
 				} else {
 					fmt.Printf("%s: not found\n", inputParts[1])
 				}
+
 			}
 			continue
 		}
