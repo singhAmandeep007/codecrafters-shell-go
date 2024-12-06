@@ -55,6 +55,8 @@ func main() {
 					fmt.Printf("%s is /bin/%s\n", inputParts[1], inputParts[1])
 				} else if _, err := os.Stat(path.Join("/usr/bin", inputParts[1])); err == nil {
 					fmt.Printf("%s is /usr/bin/%s\n", inputParts[1], inputParts[1])
+				} else if _, err := os.Stat(path.Join("/tmp/pear/raspberry/pineapple", inputParts[1])); err == nil {
+					fmt.Printf("%s is /tmp/pear/raspberry/pineapple/%s\n", inputParts[1], inputParts[1])
 				} else {
 					fmt.Printf("%s: not found\n", inputParts[1])
 				}
