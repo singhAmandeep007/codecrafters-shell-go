@@ -41,6 +41,21 @@ func main() {
 			continue
 		}
 
+		if inputParts[0] == "type" {
+			switch inputParts[1] {
+			case "echo":
+				fmt.Println("echo is a shell builtin")
+			case "type":
+				fmt.Println("type is a shell builtin")
+			case "exit":
+				fmt.Println("exit is a shell builtin")
+			default:
+				fmt.Printf("%s: not found\n", inputParts[1])
+			}
+			continue
+		}
+
+		// DEFAULT
 		// prints a message indicating that the command is not found.
 		// The input[:len(input)-1] part removes the newline character from the end of the input string, ensuring the command name is printed correctly without an extra line break.
 		// This change allows the shell to handle invalid commands by displaying a message in the format <command_name>: command not found
