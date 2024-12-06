@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -50,7 +51,13 @@ func main() {
 			case "exit":
 				fmt.Println("exit is a shell builtin")
 			default:
-				fmt.Printf("%s: not found\n", inputParts[1])
+				if _, err := os.Stat(path.Join("/bin", inputParts[1])); err == nil {
+					fmt.Printf("%s is /bin/%s\n", inputParts[1], inputParts[1])
+				} else if _, err := os.Stat(path.Join("/usr/bin", inputParts[1])); err == nil {
+					fmt.Printf("%s is /usr/bin/%s\n", inputParts[1], inputParts[1])
+				} else {
+					fmt.Printf("%s: not found\n", inputParts[1])
+				}
 			}
 			continue
 		}
