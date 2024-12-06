@@ -29,7 +29,7 @@ func main() {
 			// The echo command is implemented by splitting the input string into words using the strings.Split function.
 			// The first word is the command name, and the rest of the words are the arguments.
 			// The arguments are joined together with a space character and printed to the console.
-			fmt.Println(strings.Join(strings.Split(input, " ")[1:], " "))
+			fmt.Print(strings.Join(strings.Split(input, " ")[1:], " "))
 			continue
 		}
 
