@@ -55,6 +55,8 @@ func main() {
 				fmt.Println("type is a shell builtin")
 			case "exit":
 				fmt.Println("exit is a shell builtin")
+			case "pwd":
+				fmt.Println("pwd is a shell builtin")
 			default:
 				command := inputParts[1]
 				// The os.Getenv function is used to retrieve the value of the PATH environment variable.
@@ -83,6 +85,18 @@ func main() {
 				} else {
 					fmt.Printf("%s: not found\n", command)
 				}
+			}
+			continue
+		}
+
+		if input == "pwd" {
+			// The os.Getwd function is used to get the current working directory.
+			// If the function returns an error, the error message is printed to the console.
+			// Otherwise, the current working directory is printed.
+			if wd, err := os.Getwd(); err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println(wd)
 			}
 			continue
 		}
