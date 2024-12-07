@@ -16,6 +16,25 @@ import (
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
 var _ = fmt.Fprint
 
+/**
+ * main is the entry point of the shell program. It runs an infinite loop that continuously prompts the user for input,
+ * processes the input, and executes the corresponding commands. The shell supports built-in commands such as "echo",
+ * "type", "pwd", and "cd", as well as external commands found in the system's PATH.
+ *
+ * The main function performs the following steps:
+ * 1. Prompts the user for input by printing "$ " to the standard output.
+ * 2. Reads a line of input from the user and trims any leading or trailing whitespace.
+ * 3. Splits the input string into a slice of strings, where the first element is the command and the rest are arguments.
+ * 4. Checks if the command is a built-in command and executes the corresponding logic:
+ *    - "echo": Prints the arguments to the console.
+ *    - "type": Displays information about the specified command.
+ *    - "pwd": Prints the current working directory.
+ *    - "cd": Changes the current working directory to the specified path.
+ * 5. If the command is not a built-in command, it attempts to execute it as an external command using the exec.Command function.
+ * 6. If the command is not found, it prints an error message indicating that the command is not found.
+ *
+ * The shell continues to run until the user enters the "exit 0" command, which terminates the program.
+ */
 func main() {
 
 	for {
@@ -114,6 +133,22 @@ func main() {
 				continue
 			}
 			commandArg := inputParts[1]
+			/**
+			 * The added function cd takes an array of strings as its argument, which represents the command-line arguments passed to the cd command. Inside the function:
+			 * The first argument, which should be the directory path, is accessed with inputParts[1].
+			 * The os.Chdir function is called with this path to attempt to change the current working directory.
+			 * If os.Chdir returns an error (which happens if the directory does not exist or cannot be accessed), an error message is printed to standard output using fmt.Printf. The message follows the format "<directory>: No such file or directory\n", where <directory> is replaced with the actual directory path that was attempted.
+			 * Absolute paths, like /usr/local/bin
+			 * Relative paths, like ./, ../, ./dir.
+			 * Paths with special characters, like ~, $HOME, $PWD.
+			 */
+
+			if commandArg == "~" {
+				commandArg = os.Getenv("HOME")
+			} else if strings.HasPrefix(commandArg, "~/") {
+				commandArg = filepath.Join(os.Getenv("HOME"), commandArg[2:])
+			}
+
 			if err := os.Chdir(commandArg); err != nil {
 				fmt.Printf("cd: %s: No such file or directory\n", commandArg)
 			}
