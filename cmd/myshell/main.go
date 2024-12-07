@@ -16,17 +16,27 @@ import (
 func parseInput(input string) []string {
 	var parts []string
 	var currentPart strings.Builder
+	var quoteType rune
 	inQuotes := false
 
 	for _, char := range input {
-		switch char {
-		case '\'': // single-quoted string
-			inQuotes = !inQuotes
+		switch {
+		case char == '\'' || char == '"': // single-quoted string or double-quoted string
 			if !inQuotes {
+				// Start of a quoted section
+				inQuotes = true
+				quoteType = char
+			} else if quoteType == char {
+				// End of a quoted section
 				parts = append(parts, currentPart.String())
 				currentPart.Reset()
+				inQuotes = false
+				quoteType = 0
+			} else {
+				// Quote character inside a different type of quote
+				currentPart.WriteRune(char)
 			}
-		case ' ': // whitespace
+		case char == ' ':
 			if inQuotes {
 				currentPart.WriteRune(char)
 			} else if currentPart.Len() > 0 {
