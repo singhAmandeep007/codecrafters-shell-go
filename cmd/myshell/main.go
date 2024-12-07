@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode"
 
 	// This package provides functions to manipulate filename paths in a way that's compatible with the operating system where the program is running.
 	// It's particularly useful for building file paths using slashes on Unix-like systems or backslashes on Windows.
@@ -18,9 +19,21 @@ func parseInput(input string) []string {
 	var currentPart strings.Builder
 	var quoteType rune
 	inQuotes := false
+	escaped := false
 
 	for _, char := range input {
 		switch {
+		case escaped:
+			// Previous character was a backslash, so this character is escaped
+			currentPart.WriteRune(char)
+			escaped = false
+		case char == '\\':
+			// Backslash escape character
+			if inQuotes || !unicode.IsSpace(char) {
+				escaped = true
+			} else {
+				currentPart.WriteRune(char)
+			}
 		case char == '\'' || char == '"': // single-quoted string or double-quoted string
 			if !inQuotes {
 				// Start of a quoted section
@@ -37,7 +50,7 @@ func parseInput(input string) []string {
 				currentPart.WriteRune(char)
 			}
 		case char == ' ':
-			if inQuotes {
+			if inQuotes || escaped {
 				currentPart.WriteRune(char)
 			} else if currentPart.Len() > 0 {
 				parts = append(parts, currentPart.String())
