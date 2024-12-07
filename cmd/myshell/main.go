@@ -35,19 +35,21 @@ func main() {
 		// The strings.Split function is used to split the input string into a slice of strings.
 		inputParts := strings.Split(input, " ")
 
+		command := inputParts[0]
+
 		// If the user enters the exit command, the shell will exit.
 		if input == "exit 0" {
 			os.Exit(0)
 		}
 
-		if inputParts[0] == "echo" {
+		if command == "echo" {
 			// The first word is the command name, and the rest of the words are the arguments.
 			// The arguments are joined together with a space character and printed to the console.
 			fmt.Printf("%s\n", strings.Join(inputParts[1:], " "))
 			continue
 		}
 
-		if inputParts[0] == "type" {
+		if command == "type" {
 			switch inputParts[1] {
 			case "echo":
 				fmt.Println("echo is a shell builtin")
@@ -57,39 +59,41 @@ func main() {
 				fmt.Println("exit is a shell builtin")
 			case "pwd":
 				fmt.Println("pwd is a shell builtin")
+			case "cd":
+				fmt.Println("cd is a shell builtin")
 			default:
-				command := inputParts[1]
+				commandArg := inputParts[1]
 				// The os.Getenv function is used to retrieve the value of the PATH environment variable.
 				pathEnv := os.Getenv("PATH")
-				// The isFound variable is used to keep track of whether the command was found in any of the directories.
+				// The isFound variable is used to keep track of whether the commandArg was found in any of the directories.
 				isFound := false
 
 				if pathEnv != "" {
 					// Split PATH into directories
 					envPaths := strings.Split(pathEnv, ":")
-					// Search for the command in each directory
+					// Search for the commandArg in each directory
 					for _, dir := range envPaths {
 						// The filepath.Join function is used to construct the full path to the executable file by joining the directory path and the command name.
-						exec := filepath.Join(dir, command)
+						exec := filepath.Join(dir, commandArg)
 						// The os.Stat function is used to check if the file exists.
-						// If the file exists, the command is printed along with the full path to the executable file.
+						// If the file exists, the commandArg is printed along with the full path to the executable file.
 						if _, err := os.Stat(exec); err == nil {
-							fmt.Printf("%v is %v\n", command, exec)
+							fmt.Printf("%v is %v\n", commandArg, exec)
 							isFound = true
 							break
 						}
 					}
 					if !isFound {
-						fmt.Printf("%s: not found\n", command)
+						fmt.Printf("%s: not found\n", commandArg)
 					}
 				} else {
-					fmt.Printf("%s: not found\n", command)
+					fmt.Printf("%s: not found\n", commandArg)
 				}
 			}
 			continue
 		}
 
-		if input == "pwd" {
+		if command == "pwd" {
 			// The os.Getwd function is used to get the current working directory.
 			// If the function returns an error, the error message is printed to the console.
 			// Otherwise, the current working directory is printed.
@@ -101,8 +105,23 @@ func main() {
 			continue
 		}
 
+		if command == "cd" {
+			// The os.Chdir function is used to change the current working directory.
+			// If the function returns an error, the error message is printed to the console.
+			// Otherwise, the current working directory is printed.
+			if len(inputParts) < 2 {
+				fmt.Println("cd: missing argument")
+				continue
+			}
+			commandArg := inputParts[1]
+			if err := os.Chdir(commandArg); err != nil {
+				fmt.Printf("cd: %s: No such file or directory\n", commandArg)
+			}
+			continue
+		}
+
 		// Execute external command
-		cmd := exec.Command(inputParts[0], inputParts[1:]...)
+		cmd := exec.Command(command, inputParts[1:]...)
 
 		// Set up command output and error handling
 		cmd.Stdout = os.Stdout
