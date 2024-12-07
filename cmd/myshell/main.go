@@ -140,11 +140,16 @@ func main() {
 			 * If os.Chdir returns an error (which happens if the directory does not exist or cannot be accessed), an error message is printed to standard output using fmt.Printf. The message follows the format "<directory>: No such file or directory\n", where <directory> is replaced with the actual directory path that was attempted.
 			 * Absolute paths, like /usr/local/bin
 			 * Relative paths, like ./, ../, ./dir.
-			 * Paths with special characters, like ~, $HOME, $PWD.
+			 * Paths with special characters, like ~ which stands for the user's home directory. The home directory is specified by the HOME environment variable.
 			 */
 
+			// Handle special characters in the directory path
 			if commandArg == "~" {
+				// The os.Getenv function is used to retrieve the value of the HOME environment variable.
+				// If the commandArg is equal to ~, the HOME environment variable is used as the directory path.
 				commandArg = os.Getenv("HOME")
+				// If the commandArg starts with ~/ (indicating a relative path from the home directory), the path is constructed by joining the home directory path with the rest of the commandArg.
+				// EXAMPLE: If the HOME environment variable is /home/user and the commandArg is ~/Documents, the resulting path will be /home/user/Documents.
 			} else if strings.HasPrefix(commandArg, "~/") {
 				commandArg = filepath.Join(os.Getenv("HOME"), commandArg[2:])
 			}
