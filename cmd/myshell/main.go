@@ -4,8 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
+
+	// This package provides functions to manipulate filename paths in a way that's compatible with the operating system where the program is running.
+	// It's particularly useful for building file paths using slashes on Unix-like systems or backslashes on Windows.
+	// In the context of the shell we're building, this package will be used to construct file paths when searching for executable files in the directories specified by the PATH environment variable.
+	"path/filepath"
 )
 
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
@@ -18,7 +22,7 @@ func main() {
 
 		// Wait for user input
 		// reads a line of input from the user and stores it in the variable input.
-		// The underscore _ is used to ignore any error returned by ReadString.
+		// The underscore _ could be used to ignore any error returned by ReadString.
 		input, err := bufio.NewReader(os.Stdin).ReadString('\n')
 
 		if err != nil {
@@ -51,31 +55,33 @@ func main() {
 			case "exit":
 				fmt.Println("exit is a shell builtin")
 			default:
+				command := inputParts[1]
+				// The os.Getenv function is used to retrieve the value of the PATH environment variable.
 				pathEnv := os.Getenv("PATH")
+				// The isFound variable is used to keep track of whether the command was found in any of the directories.
+				isFound := false
+
 				if pathEnv != "" {
 					// Split PATH into directories
-					paths := strings.Split(pathEnv, ":")
-
+					envPaths := strings.Split(pathEnv, ":")
 					// Search for the command in each directory
-					found := false
-					for _, dir := range paths {
-						fullPath := filepath.Join(dir, inputParts[1])
-
-						// Check if file exists and is executable
-						info, err := os.Stat(fullPath)
-						if err == nil && !info.IsDir() && (info.Mode()&0111 != 0) {
-							fmt.Printf("%s is %s\n", inputParts[1], fullPath)
-							found = true
+					for _, dir := range envPaths {
+						// The filepath.Join function is used to construct the full path to the executable file by joining the directory path and the command name.
+						exec := filepath.Join(dir, command)
+						// The os.Stat function is used to check if the file exists.
+						// If the file exists, the command is printed along with the full path to the executable file.
+						if _, err := os.Stat(exec); err == nil {
+							fmt.Printf("%v is %v\n", command, exec)
+							isFound = true
 							break
 						}
 					}
-					if !found {
-						fmt.Printf("%s: not found\n", inputParts[1])
+					if !isFound {
+						fmt.Printf("%s: not found\n", command)
 					}
 				} else {
-					fmt.Printf("%s: not found\n", inputParts[1])
+					fmt.Printf("%s: not found\n", command)
 				}
-
 			}
 			continue
 		}
