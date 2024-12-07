@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
-	"unicode"
 
 	// This package provides functions to manipulate filename paths in a way that's compatible with the operating system where the program is running.
 	// It's particularly useful for building file paths using slashes on Unix-like systems or backslashes on Windows.
@@ -14,58 +14,26 @@ import (
 	"path/filepath"
 )
 
-func parseInput(input string) []string {
-	var parts []string
-	var currentPart strings.Builder
-	var quoteType rune
-	inQuotes := false
-	escaped := false
-
-	for _, char := range input {
-		switch {
-		case escaped:
-			// Previous character was a backslash, so this character is escaped
-			currentPart.WriteRune(char)
-			escaped = false
-		case char == '\\':
-			// Backslash escape character
-			if inQuotes || !unicode.IsSpace(char) {
-				escaped = true
-			} else {
-				currentPart.WriteRune(char)
-			}
-		case char == '\'' || char == '"': // single-quoted string or double-quoted string
-			if !inQuotes {
-				// Start of a quoted section
-				inQuotes = true
-				quoteType = char
-			} else if quoteType == char {
-				// End of a quoted section
-				parts = append(parts, currentPart.String())
-				currentPart.Reset()
-				inQuotes = false
-				quoteType = 0
-			} else {
-				// Quote character inside a different type of quote
-				currentPart.WriteRune(char)
-			}
-		case char == ' ':
-			if inQuotes || escaped {
-				currentPart.WriteRune(char)
-			} else if currentPart.Len() > 0 {
-				parts = append(parts, currentPart.String())
-				currentPart.Reset()
-			}
-		default:
-			currentPart.WriteRune(char)
+func parseInput(s string) []string {
+	// The regular expression pattern '([^']|[^"]|[^ ])+' is used to match words enclosed in single quotes, double quotes, or without quotes.
+	re := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
+	// The FindAllString function is used to find all matches of the regular expression pattern in the input string.
+	matches := re.FindAllString(s, -1)
+	var result []string
+	for _, match := range matches {
+		// If the match is enclosed in single or double quotes, the quotes are removed.
+		if (match[0] == '\'' && match[len(match)-1] == '\'') || (match[0] == '"' && match[len(match)-1] == '"') {
+			// The result is appended with the match string without the quotes.
+			result = append(result, match[1:len(match)-1])
+		} else if match[0] == '\\' {
+			// If the match starts with a backslash, the backslash is removed.
+			result = append(result, "")
+		} else {
+			// If the match is not enclosed in quotes or starts with a backslash, it is added to the result as is.
+			result = append(result, strings.ReplaceAll(match, "\\", ""))
 		}
 	}
-
-	if currentPart.Len() > 0 {
-		parts = append(parts, currentPart.String())
-	}
-
-	return parts
+	return result
 }
 
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
