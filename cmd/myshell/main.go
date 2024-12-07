@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 
 	// This package provides functions to manipulate filename paths in a way that's compatible with the operating system where the program is running.
@@ -15,24 +14,62 @@ import (
 )
 
 func parseInput(s string) []string {
-	// The regular expression pattern '([^']|[^"]|[^ ])+' is used to match words enclosed in single quotes, double quotes, or without quotes.
-	re := regexp.MustCompile(`'[^']*'|"[^"]*"|\S+`)
-	// The FindAllString function is used to find all matches of the regular expression pattern in the input string.
-	matches := re.FindAllString(s, -1)
+	var inSingleQuote bool
+	var inDoubleQuote bool
+	var hasBackslash bool
+	var arg string
 	var result []string
-	for _, match := range matches {
-		// If the match is enclosed in single or double quotes, the quotes are removed.
-		if (match[0] == '\'' && match[len(match)-1] == '\'') || (match[0] == '"' && match[len(match)-1] == '"') {
-			// The result is appended with the match string without the quotes.
-			result = append(result, match[1:len(match)-1])
-		} else if match[0] == '\\' {
-			// If the match starts with a backslash, the backslash is removed.
-			result = append(result, "")
-		} else {
-			// If the match is not enclosed in quotes or starts with a backslash, it is added to the result as is.
-			result = append(result, strings.ReplaceAll(match, "\\", ""))
+
+	for _, char := range s {
+		switch char {
+		case '\'':
+			if hasBackslash && inDoubleQuote {
+				arg += "\\"
+			}
+			if hasBackslash || inDoubleQuote {
+				arg += string(char)
+			} else {
+				inSingleQuote = !inSingleQuote
+			}
+			hasBackslash = false
+		case '"':
+			if hasBackslash || inSingleQuote {
+				arg += string(char)
+			} else {
+				inDoubleQuote = !inDoubleQuote
+			}
+			hasBackslash = false
+		case '\\':
+			if hasBackslash || inSingleQuote {
+				arg += string(char)
+				hasBackslash = false
+			} else {
+				hasBackslash = true
+			}
+		case ' ':
+			if hasBackslash && inDoubleQuote {
+				arg += "\\"
+			}
+			if hasBackslash || inSingleQuote || inDoubleQuote {
+				arg += string(char)
+			} else if arg != "" {
+				result = append(result, arg)
+				arg = ""
+			}
+			hasBackslash = false
+		default:
+			if inDoubleQuote && hasBackslash {
+				arg += "\\"
+			}
+			arg += string(char)
+			hasBackslash = false
 		}
 	}
+
+	if arg != "" {
+		result = append(result, arg)
+	}
+
 	return result
 }
 
