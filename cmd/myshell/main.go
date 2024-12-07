@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	// This package provides functions to manipulate filename paths in a way that's compatible with the operating system where the program is running.
@@ -86,10 +87,23 @@ func main() {
 			continue
 		}
 
+		// Execute external command
+		cmd := exec.Command(inputParts[0], inputParts[1:]...)
+
+		// Set up command output and error handling
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+
+		// Run the command
+		err = cmd.Run()
+
 		// DEFAULT
 		// prints a message indicating that the command is not found.
 		// The input[:len(input)-1] part removes the newline character from the end of the input string, ensuring the command name is printed correctly without an extra line break.
 		// This change allows the shell to handle invalid commands by displaying a message in the format <command_name>: command not found
-		fmt.Printf("%s: command not found\n", input[:])
+		if err != nil {
+			fmt.Printf("%s: command not found\n", input[:])
+		}
 	}
 }
