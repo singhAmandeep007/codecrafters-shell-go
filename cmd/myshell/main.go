@@ -13,6 +13,38 @@ import (
 	"path/filepath"
 )
 
+func parseInput(input string) []string {
+	var parts []string
+	var currentPart strings.Builder
+	inQuotes := false
+
+	for _, char := range input {
+		switch char {
+		case '\'': // single-quoted string
+			inQuotes = !inQuotes
+			if !inQuotes {
+				parts = append(parts, currentPart.String())
+				currentPart.Reset()
+			}
+		case ' ': // whitespace
+			if inQuotes {
+				currentPart.WriteRune(char)
+			} else if currentPart.Len() > 0 {
+				parts = append(parts, currentPart.String())
+				currentPart.Reset()
+			}
+		default:
+			currentPart.WriteRune(char)
+		}
+	}
+
+	if currentPart.Len() > 0 {
+		parts = append(parts, currentPart.String())
+	}
+
+	return parts
+}
+
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
 var _ = fmt.Fprint
 
@@ -51,10 +83,9 @@ func main() {
 
 		// The strings.TrimSpace function is used to remove any leading or trailing whitespace from the input string.
 		input = strings.TrimSpace(input)
-		// The strings.Split function is used to split the input string into a slice of strings.
-		inputParts := strings.Split(input, " ")
+		inputParts := parseInput(input)
 
-		command := inputParts[0]
+		command := strings.ToLower(inputParts[0])
 
 		// If the user enters the exit command, the shell will exit.
 		if input == "exit 0" {
@@ -62,9 +93,15 @@ func main() {
 		}
 
 		if command == "echo" {
+			commandArg := inputParts[1:]
+
+			if len(commandArg) == 0 {
+				fmt.Println("echo: missing argument")
+				continue
+			}
 			// The first word is the command name, and the rest of the words are the arguments.
 			// The arguments are joined together with a space character and printed to the console.
-			fmt.Printf("%s\n", strings.Join(inputParts[1:], " "))
+			fmt.Printf("%s\n", strings.Join(commandArg, " "))
 			continue
 		}
 
