@@ -113,7 +113,7 @@ func main() {
 		var outputFile string
 		var commandParts []string
 		for i, part := range inputParts {
-			if part == ">" {
+			if part == ">" || part == "1>" {
 				if i+1 < len(inputParts) {
 					outputFile = inputParts[i+1]
 					commandParts = inputParts[:i]
