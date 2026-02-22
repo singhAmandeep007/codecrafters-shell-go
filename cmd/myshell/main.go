@@ -78,24 +78,70 @@ type customCompleter struct {
 
 func (c *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	lineStr := string(line[:pos])
-	
-	// Find matches
-	var matches [][]rune
+
+	// Find matches in builtins
+	matchMap := make(map[string]bool)
+	var matches []string
+
 	for _, builtin := range c.builtins {
 		if strings.HasPrefix(builtin, lineStr) {
-			// Add completion with trailing space
-			completion := builtin[len(lineStr):] + " "
-			matches = append(matches, []rune(completion))
+			matches = append(matches, builtin)
+			matchMap[builtin] = true
 		}
 	}
-	
+
+	// Find matches in PATH executables
+	pathEnv := os.Getenv("PATH")
+	if pathEnv != "" {
+		pathDirs := strings.Split(pathEnv, ":")
+		for _, dir := range pathDirs {
+			// Skip if directory doesn't exist
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				continue
+			}
+
+			for _, entry := range entries {
+				name := entry.Name()
+				// Check if the file name starts with the typed text
+				if strings.HasPrefix(name, lineStr) {
+					// Check if it's already in the match list
+					if matchMap[name] {
+						continue
+					}
+
+					// Check if it's executable
+					fullPath := filepath.Join(dir, name)
+					info, err := os.Stat(fullPath)
+					if err != nil {
+						continue
+					}
+
+					// Check if it's a file (not directory) and executable
+					if !info.IsDir() && info.Mode()&0111 != 0 {
+						matches = append(matches, name)
+						matchMap[name] = true
+					}
+				}
+			}
+		}
+	}
+
 	// If no matches, ring the bell
 	if len(matches) == 0 {
 		fmt.Print("\x07") // Bell character
 		return nil, len(lineStr)
 	}
-	
-	return matches, len(lineStr)
+
+	// Convert matches to completion format
+	var completions [][]rune
+	for _, match := range matches {
+		// Add completion with trailing space
+		completion := match[len(lineStr):] + " "
+		completions = append(completions, []rune(completion))
+	}
+
+	return completions, len(lineStr)
 }
 
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
