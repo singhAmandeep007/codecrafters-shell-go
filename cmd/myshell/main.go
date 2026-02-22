@@ -131,7 +131,8 @@ func main() {
 			continue
 		}
 
-		command := strings.ToLower(commandParts[0])
+		commandName := commandParts[0]
+		command := strings.ToLower(commandName)
 
 		// If the user enters the exit command, the shell will exit.
 		if input == "exit 0" {
@@ -258,7 +259,14 @@ func main() {
 		}
 
 		// Execute external command
-		cmd := exec.Command(command, commandParts[1:]...)
+		// Check if command exists in PATH
+		executable, err := exec.LookPath(commandName)
+		if err != nil {
+			fmt.Printf("%s: command not found\n", commandName)
+			continue
+		}
+
+		cmd := exec.Command(executable, commandParts[1:]...)
 
 		// Handle output redirection
 		if outputFile != "" {
