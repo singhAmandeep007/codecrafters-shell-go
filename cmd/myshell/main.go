@@ -112,12 +112,21 @@ func main() {
 		// Check for output redirection
 		var outputFile string
 		var errorFile string
+		var appendOutput bool
 		var commandParts []string
 		for i, part := range inputParts {
 			if part == ">" || part == "1>" {
 				if i+1 < len(inputParts) {
 					outputFile = inputParts[i+1]
 					commandParts = inputParts[:i]
+					appendOutput = false
+				}
+				break
+			} else if part == ">>" || part == "1>>" {
+				if i+1 < len(inputParts) {
+					outputFile = inputParts[i+1]
+					commandParts = inputParts[:i]
+					appendOutput = true
 				}
 				break
 			} else if part == "2>" {
@@ -163,7 +172,13 @@ func main() {
 
 			if outputFile != "" {
 				// Write to file
-				file, err := os.Create(outputFile)
+				var file *os.File
+				var err error
+				if appendOutput {
+					file, err = os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				} else {
+					file, err = os.Create(outputFile)
+				}
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
 					continue
@@ -296,7 +311,13 @@ func main() {
 
 		// Handle output redirection
 		if outputFile != "" {
-			file, err := os.Create(outputFile)
+			var file *os.File
+			var err error
+			if appendOutput {
+				file, err = os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			} else {
+				file, err = os.Create(outputFile)
+			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
 				continue
