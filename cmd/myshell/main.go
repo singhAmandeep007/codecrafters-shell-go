@@ -135,8 +135,12 @@ func main() {
 		command := strings.ToLower(commandName)
 
 		// If the user enters the exit command, the shell will exit.
-		if input == "exit 0" {
-			os.Exit(0)
+		if command == "exit" {
+			if len(commandParts) > 1 && commandParts[1] == "0" {
+				os.Exit(0)
+			} else if len(commandParts) == 1 {
+				os.Exit(0)
+			}
 		}
 
 		if command == "echo" {
@@ -191,13 +195,16 @@ func main() {
 					// Search for the commandArg in each directory
 					for _, dir := range envPaths {
 						// The filepath.Join function is used to construct the full path to the executable file by joining the directory path and the command name.
-						exec := filepath.Join(dir, commandArg)
+						execPath := filepath.Join(dir, commandArg)
 						// The os.Stat function is used to check if the file exists.
 						// If the file exists, the commandArg is printed along with the full path to the executable file.
-						if _, err := os.Stat(exec); err == nil {
-							fmt.Printf("%v is %v\n", commandArg, exec)
-							isFound = true
-							break
+						if info, err := os.Stat(execPath); err == nil && !info.IsDir() {
+							// Check if the file is executable
+							if info.Mode()&0111 != 0 {
+								fmt.Printf("%v is %v\n", commandArg, execPath)
+								isFound = true
+								break
+							}
 						}
 					}
 					if !isFound {
