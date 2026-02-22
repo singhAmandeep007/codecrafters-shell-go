@@ -71,6 +71,31 @@ func parseInput(s string) []string {
 	return result
 }
 
+// customCompleter wraps the prefix completer and rings the bell when there are no matches
+type customCompleter struct {
+	builtins []string
+}
+
+func (c *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
+	lineStr := string(line[:pos])
+	
+	// Find matches
+	var matches [][]rune
+	for _, builtin := range c.builtins {
+		if strings.HasPrefix(builtin, lineStr) {
+			matches = append(matches, []rune(builtin[len(lineStr):]))
+		}
+	}
+	
+	// If no matches, ring the bell
+	if len(matches) == 0 {
+		fmt.Print("\x07") // Bell character
+		return nil, len(lineStr)
+	}
+	
+	return matches, len(lineStr)
+}
+
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
 var _ = fmt.Fprint
 
@@ -94,14 +119,10 @@ var _ = fmt.Fprint
  * The shell continues to run until the user enters the "exit 0" command, which terminates the program.
  */
 func main() {
-	// Configure readline with tab completion for builtins
-	completer := readline.NewPrefixCompleter(
-		readline.PcItem("echo"),
-		readline.PcItem("exit"),
-		readline.PcItem("type"),
-		readline.PcItem("pwd"),
-		readline.PcItem("cd"),
-	)
+	// Configure readline with custom tab completion for builtins
+	completer := &customCompleter{
+		builtins: []string{"echo", "exit", "type", "pwd", "cd"},
+	}
 
 	config := &readline.Config{
 		Prompt:       "$ ",
