@@ -113,6 +113,7 @@ func main() {
 		var outputFile string
 		var errorFile string
 		var appendOutput bool
+		var appendError bool
 		var commandParts []string
 		for i, part := range inputParts {
 			if part == ">" || part == "1>" {
@@ -133,6 +134,14 @@ func main() {
 				if i+1 < len(inputParts) {
 					errorFile = inputParts[i+1]
 					commandParts = inputParts[:i]
+					appendError = false
+				}
+				break
+			} else if part == "2>>" {
+				if i+1 < len(inputParts) {
+					errorFile = inputParts[i+1]
+					commandParts = inputParts[:i]
+					appendError = true
 				}
 				break
 			}
@@ -330,7 +339,13 @@ func main() {
 
 		// Handle error redirection
 		if errorFile != "" {
-			file, err := os.Create(errorFile)
+			var file *os.File
+			var err error
+			if appendError {
+				file, err = os.OpenFile(errorFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			} else {
+				file, err = os.Create(errorFile)
+			}
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
 				continue
