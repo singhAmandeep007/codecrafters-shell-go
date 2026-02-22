@@ -111,6 +111,7 @@ func main() {
 
 		// Check for output redirection
 		var outputFile string
+		var errorFile string
 		var commandParts []string
 		for i, part := range inputParts {
 			if part == ">" || part == "1>" {
@@ -119,11 +120,17 @@ func main() {
 					commandParts = inputParts[:i]
 				}
 				break
+			} else if part == "2>" {
+				if i+1 < len(inputParts) {
+					errorFile = inputParts[i+1]
+					commandParts = inputParts[:i]
+				}
+				break
 			}
 		}
 
 		// If no redirection found, use all parts
-		if outputFile == "" {
+		if outputFile == "" && errorFile == "" {
 			commandParts = inputParts
 		}
 
@@ -166,6 +173,16 @@ func main() {
 			} else {
 				// Write to stdout
 				fmt.Println(output)
+			}
+
+			if errorFile != "" {
+				// Create the error file even if there's no error output for echo
+				file, err := os.Create(errorFile)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+					continue
+				}
+				file.Close()
 			}
 			continue
 		}
@@ -290,7 +307,19 @@ func main() {
 			cmd.Stdout = os.Stdout
 		}
 
-		cmd.Stderr = os.Stderr
+		// Handle error redirection
+		if errorFile != "" {
+			file, err := os.Create(errorFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+				continue
+			}
+			defer file.Close()
+			cmd.Stderr = file
+		} else {
+			cmd.Stderr = os.Stderr
+		}
+
 		cmd.Stdin = os.Stdin
 
 		cmd.Run()
