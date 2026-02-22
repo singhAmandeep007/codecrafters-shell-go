@@ -1,4 +1,4 @@
-package main // shell made using Go programming language
+package main
 
 import (
 	"fmt"
@@ -6,210 +6,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/chzyer/readline"
+	"github.com/codecrafters-io/shell-starter-go/internal/completer"
+	"github.com/codecrafters-io/shell-starter-go/internal/parser"
+	"github.com/codecrafters-io/shell-starter-go/internal/redirect"
 )
 
-func parseInput(s string) []string {
-	var inSingleQuote bool
-	var inDoubleQuote bool
-	var hasBackslash bool
-	var arg string
-	var result []string
+// builtinNames lists all shell builtin command names.
+var builtinNames = []string{"echo", "exit", "type", "pwd", "cd"}
 
-	for _, char := range s {
-		switch char {
-		case '\'':
-			if hasBackslash && inDoubleQuote {
-				arg += "\\"
-			}
-			if hasBackslash || inDoubleQuote {
-				arg += string(char)
-			} else {
-				inSingleQuote = !inSingleQuote
-			}
-			hasBackslash = false
-		case '"':
-			if hasBackslash || inSingleQuote {
-				arg += string(char)
-			} else {
-				inDoubleQuote = !inDoubleQuote
-			}
-			hasBackslash = false
-		case '\\':
-			if hasBackslash || inSingleQuote {
-				arg += string(char)
-				hasBackslash = false
-			} else {
-				hasBackslash = true
-			}
-		case ' ':
-			if hasBackslash && inDoubleQuote {
-				arg += "\\"
-			}
-			if hasBackslash || inSingleQuote || inDoubleQuote {
-				arg += string(char)
-			} else if arg != "" {
-				result = append(result, arg)
-				arg = ""
-			}
-			hasBackslash = false
-		default:
-			if inDoubleQuote && hasBackslash {
-				arg += "\\"
-			}
-			arg += string(char)
-			hasBackslash = false
-		}
-	}
-
-	if arg != "" {
-		result = append(result, arg)
-	}
-
-	return result
-}
-
-// customCompleter wraps the prefix completer and rings the bell when there are no matches
-type customCompleter struct {
-	builtins    []string
-	lastLine    string
-	lastMatches []string
-	tabCount    int
-}
-
-func (c *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
-	lineStr := string(line[:pos])
-
-	// Check if this is a repeat of the last completion attempt
-	if lineStr == c.lastLine {
-		c.tabCount++
-	} else {
-		c.tabCount = 1
-		c.lastLine = lineStr
-	}
-
-	// Find matches in builtins
-	matchMap := make(map[string]bool)
-	var matches []string
-
-	for _, builtin := range c.builtins {
-		if strings.HasPrefix(builtin, lineStr) {
-			matches = append(matches, builtin)
-			matchMap[builtin] = true
-		}
-	}
-
-	// Find matches in PATH executables
-	pathEnv := os.Getenv("PATH")
-	if pathEnv != "" {
-		pathDirs := strings.Split(pathEnv, ":")
-		for _, dir := range pathDirs {
-			// Skip if directory doesn't exist
-			entries, err := os.ReadDir(dir)
-			if err != nil {
-				continue
-			}
-
-			for _, entry := range entries {
-				name := entry.Name()
-				// Check if the file name starts with the typed text
-				if strings.HasPrefix(name, lineStr) {
-					// Check if it's already in the match list
-					if matchMap[name] {
-						continue
-					}
-
-					// Check if it's executable
-					fullPath := filepath.Join(dir, name)
-					info, err := os.Stat(fullPath)
-					if err != nil {
-						continue
-					}
-
-					// Check if it's a file (not directory) and executable
-					if !info.IsDir() && info.Mode()&0111 != 0 {
-						matches = append(matches, name)
-						matchMap[name] = true
-					}
-				}
-			}
-		}
-	}
-
-	// Store matches for potential second TAB
-	c.lastMatches = matches
-
-	// If no matches, ring the bell
-	if len(matches) == 0 {
-		fmt.Print("\x07") // Bell character
-		c.tabCount = 0
-		return nil, len(lineStr)
-	}
-
-	// If only one match, complete it
-	if len(matches) == 1 {
-		c.tabCount = 0
-		completion := matches[0][len(lineStr):] + " "
-		return [][]rune{[]rune(completion)}, len(lineStr)
-	}
-
-	// Multiple matches
-	if c.tabCount == 1 {
-		// First TAB - ring the bell
-		fmt.Print("\x07")
-		return nil, len(lineStr)
-	} else if c.tabCount >= 2 {
-		// Second TAB - display all matches
-		// Sort matches alphabetically
-		sort.Strings(matches)
-		
-		// Print matches on a new line, separated by two spaces
-		// Then redisplay the prompt and current input
-		os.Stdout.WriteString("\n" + strings.Join(matches, "  ") + "\n$ " + lineStr)
-		os.Stdout.Sync()
-		
-		c.tabCount = 0
-		// Return nil to keep the line as is
-		return nil, len(lineStr)
-	}
-
-	return nil, len(lineStr)
-}
-
-// Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
-var _ = fmt.Fprint
-
-/**
- * main is the entry point of the shell program. It runs an infinite loop that continuously prompts the user for input,
- * processes the input, and executes the corresponding commands. The shell supports built-in commands such as "echo",
- * "type", "pwd", and "cd", as well as external commands found in the system's PATH.
- *
- * The main function performs the following steps:
- * 1. Prompts the user for input by printing "$ " to the standard output.
- * 2. Reads a line of input from the user and trims any leading or trailing whitespace.
- * 3. Splits the input string into a slice of strings, where the first element is the command and the rest are arguments.
- * 4. Checks if the command is a built-in command and executes the corresponding logic:
- *    - "echo": Prints the arguments to the console.
- *    - "type": Displays information about the specified command.
- *    - "pwd": Prints the current working directory.
- *    - "cd": Changes the current working directory to the specified path.
- * 5. If the command is not a built-in command, it attempts to execute it as an external command using the exec.Command function.
- * 6. If the command is not found, it prints an error message indicating that the command is not found.
- *
- * The shell continues to run until the user enters the "exit 0" command, which terminates the program.
- */
 func main() {
-	// Configure readline with custom tab completion for builtins
-	completer := &customCompleter{
-		builtins: []string{"echo", "exit", "type", "pwd", "cd"},
+	comp := &completer.Completer{
+		Builtins: builtinNames,
 	}
 
 	config := &readline.Config{
 		Prompt:       "$ ",
-		AutoComplete: completer,
+		AutoComplete: comp,
 	}
 
 	rl, err := readline.NewEx(config)
@@ -220,9 +35,7 @@ func main() {
 	defer rl.Close()
 
 	for {
-		// Wait for user input with tab completion support
 		input, err := rl.Readline()
-
 		if err != nil {
 			if err == io.EOF || err == readline.ErrInterrupt {
 				os.Exit(0)
@@ -230,259 +43,176 @@ func main() {
 			os.Exit(1)
 		}
 
-		// The strings.TrimSpace function is used to remove any leading or trailing whitespace from the input string.
 		input = strings.TrimSpace(input)
-		inputParts := parseInput(input)
+		inputParts := parser.ParseInput(input)
+		redir := redirect.Parse(inputParts)
 
-		// Check for output redirection
-		var outputFile string
-		var errorFile string
-		var appendOutput bool
-		var appendError bool
-		var commandParts []string
-		for i, part := range inputParts {
-			if part == ">" || part == "1>" {
-				if i+1 < len(inputParts) {
-					outputFile = inputParts[i+1]
-					commandParts = inputParts[:i]
-					appendOutput = false
-				}
-				break
-			} else if part == ">>" || part == "1>>" {
-				if i+1 < len(inputParts) {
-					outputFile = inputParts[i+1]
-					commandParts = inputParts[:i]
-					appendOutput = true
-				}
-				break
-			} else if part == "2>" {
-				if i+1 < len(inputParts) {
-					errorFile = inputParts[i+1]
-					commandParts = inputParts[:i]
-					appendError = false
-				}
-				break
-			} else if part == "2>>" {
-				if i+1 < len(inputParts) {
-					errorFile = inputParts[i+1]
-					commandParts = inputParts[:i]
-					appendError = true
-				}
-				break
-			}
-		}
-
-		// If no redirection found, use all parts
-		if outputFile == "" && errorFile == "" {
-			commandParts = inputParts
-		}
-
-		if len(commandParts) == 0 {
+		if len(redir.CommandParts) == 0 {
 			continue
 		}
 
-		commandName := commandParts[0]
-		command := strings.ToLower(commandName)
+		command := strings.ToLower(redir.CommandParts[0])
 
-		// If the user enters the exit command, the shell will exit.
-		if command == "exit" {
-			if len(commandParts) > 1 && commandParts[1] == "0" {
-				os.Exit(0)
-			} else if len(commandParts) == 1 {
-				os.Exit(0)
-			}
+		switch command {
+		case "exit":
+			handleExit(redir.CommandParts)
+		case "echo":
+			handleEcho(redir)
+		case "type":
+			handleType(redir.CommandParts)
+		case "pwd":
+			handlePwd()
+		case "cd":
+			handleCd(redir.CommandParts)
+		default:
+			executeExternal(redir)
 		}
-
-		if command == "echo" {
-			commandArg := commandParts[1:]
-
-			if len(commandArg) == 0 {
-				fmt.Println("echo: missing argument")
-				continue
-			}
-			// The first word is the command name, and the rest of the words are the arguments.
-			// The arguments are joined together with a space character and printed to the console.
-			output := strings.Join(commandArg, " ")
-
-			if outputFile != "" {
-				// Write to file
-				var file *os.File
-				var err error
-				if appendOutput {
-					file, err = os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				} else {
-					file, err = os.Create(outputFile)
-				}
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
-					continue
-				}
-				defer file.Close()
-				fmt.Fprintln(file, output)
-			} else {
-				// Write to stdout
-				fmt.Println(output)
-			}
-
-			if errorFile != "" {
-				// Create the error file even if there's no error output for echo
-				file, err := os.Create(errorFile)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
-					continue
-				}
-				file.Close()
-			}
-			continue
-		}
-
-		if command == "type" {
-			switch commandParts[1] {
-			case "echo":
-				fmt.Println("echo is a shell builtin")
-			case "type":
-				fmt.Println("type is a shell builtin")
-			case "exit":
-				fmt.Println("exit is a shell builtin")
-			case "pwd":
-				fmt.Println("pwd is a shell builtin")
-			case "cd":
-				fmt.Println("cd is a shell builtin")
-			default:
-				commandArg := commandParts[1]
-				// The os.Getenv function is used to retrieve the value of the PATH environment variable.
-				pathEnv := os.Getenv("PATH")
-				// The isFound variable is used to keep track of whether the commandArg was found in any of the directories.
-				isFound := false
-
-				if pathEnv != "" {
-					// Split PATH into directories
-					envPaths := strings.Split(pathEnv, ":")
-					// Search for the commandArg in each directory
-					for _, dir := range envPaths {
-						// The filepath.Join function is used to construct the full path to the executable file by joining the directory path and the command name.
-						execPath := filepath.Join(dir, commandArg)
-						// The os.Stat function is used to check if the file exists.
-						// If the file exists, the commandArg is printed along with the full path to the executable file.
-						if info, err := os.Stat(execPath); err == nil && !info.IsDir() {
-							// Check if the file is executable
-							if info.Mode()&0111 != 0 {
-								fmt.Printf("%v is %v\n", commandArg, execPath)
-								isFound = true
-								break
-							}
-						}
-					}
-					if !isFound {
-						fmt.Printf("%s: not found\n", commandArg)
-					}
-				} else {
-					fmt.Printf("%s: not found\n", commandArg)
-				}
-			}
-			continue
-		}
-
-		if command == "pwd" {
-			// The os.Getwd function is used to get the current working directory.
-			// If the function returns an error, the error message is printed to the console.
-			// Otherwise, the current working directory is printed.
-			if wd, err := os.Getwd(); err != nil {
-				fmt.Println(err)
-			} else {
-				fmt.Println(wd)
-			}
-			continue
-		}
-
-		if command == "cd" {
-			// The os.Chdir function is used to change the current working directory.
-			// If the function returns an error, the error message is printed to the console.
-			// Otherwise, the current working directory is printed.
-			if len(commandParts) < 2 {
-				fmt.Println("cd: missing argument")
-				continue
-			}
-			commandArg := commandParts[1]
-			/**
-			 * The added function cd takes an array of strings as its argument, which represents the command-line arguments passed to the cd command. Inside the function:
-			 * The first argument, which should be the directory path, is accessed with inputParts[1].
-			 * The os.Chdir function is called with this path to attempt to change the current working directory.
-			 * If os.Chdir returns an error (which happens if the directory does not exist or cannot be accessed), an error message is printed to standard output using fmt.Printf. The message follows the format "<directory>: No such file or directory\n", where <directory> is replaced with the actual directory path that was attempted.
-			 * Absolute paths, like /usr/local/bin
-			 * Relative paths, like ./, ../, ./dir.
-			 * Paths with special characters, like ~ which stands for the user's home directory. The home directory is specified by the HOME environment variable.
-			 */
-
-			// Handle special characters in the directory path
-			if commandArg == "~" {
-				// The os.Getenv function is used to retrieve the value of the HOME environment variable.
-				// If the commandArg is equal to ~, the HOME environment variable is used as the directory path.
-				commandArg = os.Getenv("HOME")
-				// If the commandArg starts with ~/ (indicating a relative path from the home directory), the path is constructed by joining the home directory path with the rest of the commandArg.
-				// EXAMPLE: If the HOME environment variable is /home/user and the commandArg is ~/Documents, the resulting path will be /home/user/Documents.
-			} else if strings.HasPrefix(commandArg, "~/") {
-				commandArg = filepath.Join(os.Getenv("HOME"), commandArg[2:])
-			}
-
-			if err := os.Chdir(commandArg); err != nil {
-				fmt.Printf("cd: %s: No such file or directory\n", commandArg)
-			}
-			continue
-		}
-
-		// Execute external command
-		// Check if command exists in PATH
-		executable, err := exec.LookPath(commandName)
-		if err != nil {
-			fmt.Printf("%s: command not found\n", commandName)
-			continue
-		}
-
-		cmd := exec.Command(executable, commandParts[1:]...)
-		// Set the first argument (Arg #0) to the original command name, not the full path
-		cmd.Args[0] = commandName
-
-		// Handle output redirection
-		if outputFile != "" {
-			var file *os.File
-			var err error
-			if appendOutput {
-				file, err = os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			} else {
-				file, err = os.Create(outputFile)
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
-				continue
-			}
-			defer file.Close()
-			cmd.Stdout = file
-		} else {
-			cmd.Stdout = os.Stdout
-		}
-
-		// Handle error redirection
-		if errorFile != "" {
-			var file *os.File
-			var err error
-			if appendError {
-				file, err = os.OpenFile(errorFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			} else {
-				file, err = os.Create(errorFile)
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
-				continue
-			}
-			defer file.Close()
-			cmd.Stderr = file
-		} else {
-			cmd.Stderr = os.Stderr
-		}
-
-		cmd.Stdin = os.Stdin
-
-		cmd.Run()
 	}
+}
+
+// handleExit exits the shell. Supports "exit" and "exit 0".
+func handleExit(parts []string) {
+	if len(parts) == 1 || (len(parts) > 1 && parts[1] == "0") {
+		os.Exit(0)
+	}
+}
+
+// handleEcho writes the arguments to stdout or to a redirected output file.
+// Also creates an empty error file if stderr redirection is specified.
+func handleEcho(redir redirect.Redirect) {
+	if len(redir.CommandParts) < 2 {
+		fmt.Println("echo: missing argument")
+		return
+	}
+
+	output := strings.Join(redir.CommandParts[1:], " ")
+
+	if redir.HasOutput() {
+		file, err := redir.OpenOutputFile()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+			return
+		}
+		fmt.Fprintln(file, output)
+		file.Close()
+	} else {
+		fmt.Println(output)
+	}
+
+	// Create empty error file for echo (codecrafters requirement)
+	if redir.HasError() {
+		file, err := os.Create(redir.ErrorFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+			return
+		}
+		file.Close()
+	}
+}
+
+// handleType reports whether a command is a builtin or an external executable.
+func handleType(parts []string) {
+	if len(parts) < 2 {
+		return
+	}
+
+	target := parts[1]
+
+	// Check if it's a builtin
+	for _, name := range builtinNames {
+		if target == name {
+			fmt.Printf("%s is a shell builtin\n", target)
+			return
+		}
+	}
+
+	// Search PATH for the executable
+	pathEnv := os.Getenv("PATH")
+	if pathEnv != "" {
+		for _, dir := range strings.Split(pathEnv, ":") {
+			execPath := filepath.Join(dir, target)
+			info, err := os.Stat(execPath)
+			if err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
+				fmt.Printf("%s is %s\n", target, execPath)
+				return
+			}
+		}
+	}
+
+	fmt.Printf("%s: not found\n", target)
+}
+
+// handlePwd prints the current working directory.
+func handlePwd() {
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(wd)
+}
+
+// handleCd changes the current working directory.
+// Supports absolute paths, relative paths, ~ and ~/... for home directory.
+func handleCd(parts []string) {
+	if len(parts) < 2 {
+		fmt.Println("cd: missing argument")
+		return
+	}
+
+	dir := parts[1]
+
+	// Expand home directory
+	if dir == "~" {
+		dir = os.Getenv("HOME")
+	} else if strings.HasPrefix(dir, "~/") {
+		dir = filepath.Join(os.Getenv("HOME"), dir[2:])
+	}
+
+	if err := os.Chdir(dir); err != nil {
+		fmt.Printf("cd: %s: No such file or directory\n", dir)
+	}
+}
+
+// executeExternal runs an external command found in PATH, with I/O redirection support.
+func executeExternal(redir redirect.Redirect) {
+	commandName := redir.CommandParts[0]
+
+	executable, err := exec.LookPath(commandName)
+	if err != nil {
+		fmt.Printf("%s: command not found\n", commandName)
+		return
+	}
+
+	cmd := exec.Command(executable, redir.CommandParts[1:]...)
+	cmd.Args[0] = commandName // Use original name, not full path
+	cmd.Stdin = os.Stdin
+
+	// Setup stdout
+	if redir.HasOutput() {
+		file, err := redir.OpenOutputFile()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+			return
+		}
+		defer file.Close()
+		cmd.Stdout = file
+	} else {
+		cmd.Stdout = os.Stdout
+	}
+
+	// Setup stderr
+	if redir.HasError() {
+		file, err := redir.OpenErrorFile()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+			return
+		}
+		defer file.Close()
+		cmd.Stderr = file
+	} else {
+		cmd.Stderr = os.Stderr
+	}
+
+	cmd.Run()
 }
