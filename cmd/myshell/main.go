@@ -102,12 +102,12 @@ func main() {
 		readline.PcItem("pwd"),
 		readline.PcItem("cd"),
 	)
-	
+
 	config := &readline.Config{
 		Prompt:       "$ ",
 		AutoComplete: completer,
 	}
-	
+
 	rl, err := readline.NewEx(config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize readline: %v\n", err)
