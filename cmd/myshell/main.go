@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -73,11 +74,22 @@ func parseInput(s string) []string {
 
 // customCompleter wraps the prefix completer and rings the bell when there are no matches
 type customCompleter struct {
-	builtins []string
+	builtins    []string
+	lastLine    string
+	lastMatches []string
+	tabCount    int
 }
 
 func (c *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	lineStr := string(line[:pos])
+
+	// Check if this is a repeat of the last completion attempt
+	if lineStr == c.lastLine {
+		c.tabCount++
+	} else {
+		c.tabCount = 1
+		c.lastLine = lineStr
+	}
 
 	// Find matches in builtins
 	matchMap := make(map[string]bool)
@@ -127,21 +139,44 @@ func (c *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 		}
 	}
 
+	// Store matches for potential second TAB
+	c.lastMatches = matches
+
 	// If no matches, ring the bell
 	if len(matches) == 0 {
 		fmt.Print("\x07") // Bell character
+		c.tabCount = 0
 		return nil, len(lineStr)
 	}
 
-	// Convert matches to completion format
-	var completions [][]rune
-	for _, match := range matches {
-		// Add completion with trailing space
-		completion := match[len(lineStr):] + " "
-		completions = append(completions, []rune(completion))
+	// If only one match, complete it
+	if len(matches) == 1 {
+		c.tabCount = 0
+		completion := matches[0][len(lineStr):] + " "
+		return [][]rune{[]rune(completion)}, len(lineStr)
 	}
 
-	return completions, len(lineStr)
+	// Multiple matches
+	if c.tabCount == 1 {
+		// First TAB - ring the bell
+		fmt.Print("\x07")
+		return nil, len(lineStr)
+	} else if c.tabCount >= 2 {
+		// Second TAB - display all matches
+		// Sort matches alphabetically
+		sort.Strings(matches)
+		
+		// Print matches on a new line, separated by two spaces
+		// Then redisplay the prompt and current input
+		os.Stdout.WriteString("\n" + strings.Join(matches, "  ") + "\n$ " + lineStr)
+		os.Stdout.Sync()
+		
+		c.tabCount = 0
+		// Return nil to keep the line as is
+		return nil, len(lineStr)
+	}
+
+	return nil, len(lineStr)
 }
 
 // Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
