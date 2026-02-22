@@ -1,16 +1,12 @@
-package main
+package main // shell made using Go programming language
 
 import (
 	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
-
-	// This package provides functions to manipulate filename paths in a way that's compatible with the operating system where the program is running.
-	// It's particularly useful for building file paths using slashes on Unix-like systems or backslashes on Windows.
-	// In the context of the shell we're building, this package will be used to construct file paths when searching for executable files in the directories specified by the PATH environment variable.
 	"path/filepath"
+	"strings"
 )
 
 func parseInput(s string) []string {
@@ -113,7 +109,29 @@ func main() {
 		input = strings.TrimSpace(input)
 		inputParts := parseInput(input)
 
-		command := strings.ToLower(inputParts[0])
+		// Check for output redirection
+		var outputFile string
+		var commandParts []string
+		for i, part := range inputParts {
+			if part == ">" {
+				if i+1 < len(inputParts) {
+					outputFile = inputParts[i+1]
+					commandParts = inputParts[:i]
+				}
+				break
+			}
+		}
+
+		// If no redirection found, use all parts
+		if outputFile == "" {
+			commandParts = inputParts
+		}
+
+		if len(commandParts) == 0 {
+			continue
+		}
+
+		command := strings.ToLower(commandParts[0])
 
 		// If the user enters the exit command, the shell will exit.
 		if input == "exit 0" {
@@ -121,7 +139,7 @@ func main() {
 		}
 
 		if command == "echo" {
-			commandArg := inputParts[1:]
+			commandArg := commandParts[1:]
 
 			if len(commandArg) == 0 {
 				fmt.Println("echo: missing argument")
@@ -129,12 +147,26 @@ func main() {
 			}
 			// The first word is the command name, and the rest of the words are the arguments.
 			// The arguments are joined together with a space character and printed to the console.
-			fmt.Printf("%s\n", strings.Join(commandArg, " "))
+			output := strings.Join(commandArg, " ")
+
+			if outputFile != "" {
+				// Write to file
+				file, err := os.Create(outputFile)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+					continue
+				}
+				defer file.Close()
+				fmt.Fprintln(file, output)
+			} else {
+				// Write to stdout
+				fmt.Println(output)
+			}
 			continue
 		}
 
 		if command == "type" {
-			switch inputParts[1] {
+			switch commandParts[1] {
 			case "echo":
 				fmt.Println("echo is a shell builtin")
 			case "type":
@@ -146,7 +178,7 @@ func main() {
 			case "cd":
 				fmt.Println("cd is a shell builtin")
 			default:
-				commandArg := inputParts[1]
+				commandArg := commandParts[1]
 				// The os.Getenv function is used to retrieve the value of the PATH environment variable.
 				pathEnv := os.Getenv("PATH")
 				// The isFound variable is used to keep track of whether the commandArg was found in any of the directories.
@@ -193,11 +225,11 @@ func main() {
 			// The os.Chdir function is used to change the current working directory.
 			// If the function returns an error, the error message is printed to the console.
 			// Otherwise, the current working directory is printed.
-			if len(inputParts) < 2 {
+			if len(commandParts) < 2 {
 				fmt.Println("cd: missing argument")
 				continue
 			}
-			commandArg := inputParts[1]
+			commandArg := commandParts[1]
 			/**
 			 * The added function cd takes an array of strings as its argument, which represents the command-line arguments passed to the cd command. Inside the function:
 			 * The first argument, which should be the directory path, is accessed with inputParts[1].
@@ -226,14 +258,24 @@ func main() {
 		}
 
 		// Execute external command
-		cmd := exec.Command(command, inputParts[1:]...)
+		cmd := exec.Command(command, commandParts[1:]...)
 
-		// Set up command output and error handling
-		cmd.Stdout = os.Stdout
+		// Handle output redirection
+		if outputFile != "" {
+			file, err := os.Create(outputFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
+				continue
+			}
+			defer file.Close()
+			cmd.Stdout = file
+		} else {
+			cmd.Stdout = os.Stdout
+		}
+
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 
-		// Run the command
 		err = cmd.Run()
 
 		// DEFAULT
@@ -241,7 +283,7 @@ func main() {
 		// The input[:len(input)-1] part removes the newline character from the end of the input string, ensuring the command name is printed correctly without an extra line break.
 		// This change allows the shell to handle invalid commands by displaying a message in the format <command_name>: command not found
 		if err != nil {
-			fmt.Printf("%s: command not found\n", input[:])
+			fmt.Printf("%s: command not found\n", command)
 		}
 	}
 }
