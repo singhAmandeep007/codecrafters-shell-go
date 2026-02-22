@@ -1,12 +1,14 @@
 package main // shell made using Go programming language
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/chzyer/readline"
 )
 
 func parseInput(s string) []string {
@@ -92,16 +94,35 @@ var _ = fmt.Fprint
  * The shell continues to run until the user enters the "exit 0" command, which terminates the program.
  */
 func main() {
+	// Configure readline with tab completion for builtins
+	completer := readline.NewPrefixCompleter(
+		readline.PcItem("echo"),
+		readline.PcItem("exit"),
+		readline.PcItem("type"),
+		readline.PcItem("pwd"),
+		readline.PcItem("cd"),
+	)
+	
+	config := &readline.Config{
+		Prompt:       "$ ",
+		AutoComplete: completer,
+	}
+	
+	rl, err := readline.NewEx(config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize readline: %v\n", err)
+		os.Exit(1)
+	}
+	defer rl.Close()
 
 	for {
-		fmt.Fprint(os.Stdout, "$ ")
-
-		// Wait for user input
-		// reads a line of input from the user and stores it in the variable input.
-		// The underscore _ could be used to ignore any error returned by ReadString.
-		input, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		// Wait for user input with tab completion support
+		input, err := rl.Readline()
 
 		if err != nil {
+			if err == io.EOF || err == readline.ErrInterrupt {
+				os.Exit(0)
+			}
 			os.Exit(1)
 		}
 
