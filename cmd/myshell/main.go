@@ -267,6 +267,8 @@ func main() {
 		}
 
 		cmd := exec.Command(executable, commandParts[1:]...)
+		// Set the first argument (Arg #0) to the original command name, not the full path
+		cmd.Args[0] = commandName
 
 		// Handle output redirection
 		if outputFile != "" {
