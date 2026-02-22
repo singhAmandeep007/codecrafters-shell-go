@@ -284,14 +284,6 @@ func main() {
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 
-		err = cmd.Run()
-
-		// DEFAULT
-		// prints a message indicating that the command is not found.
-		// The input[:len(input)-1] part removes the newline character from the end of the input string, ensuring the command name is printed correctly without an extra line break.
-		// This change allows the shell to handle invalid commands by displaying a message in the format <command_name>: command not found
-		if err != nil {
-			fmt.Printf("%s: command not found\n", command)
-		}
+		cmd.Run()
 	}
 }
