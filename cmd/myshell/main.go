@@ -83,7 +83,9 @@ func (c *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 	var matches [][]rune
 	for _, builtin := range c.builtins {
 		if strings.HasPrefix(builtin, lineStr) {
-			matches = append(matches, []rune(builtin[len(lineStr):]))
+			// Add completion with trailing space
+			completion := builtin[len(lineStr):] + " "
+			matches = append(matches, []rune(completion))
 		}
 	}
 	
